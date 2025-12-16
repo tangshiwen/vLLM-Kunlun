@@ -79,17 +79,16 @@ bash xpytorch-cp310-torch251-ubuntu2004-x64.run
 
 ## Install custom ops
 ```
-pip uninstall xtorch_ops -y && pip install \
-"https://baidu-kunlun-public.su.bcebos.com/v1/baidu-kunlun-share/xtorch_ops-0.1.2028%2B1baf1b15-cp310-cp310-linux_x86_64.whl?authorization=bce-auth-v1%2FALTAKypXxBzU7gg4Mk4K4c6OYR%2F2025-10-31T10%3A38%3A24Z%2F-1%2Fhost%2Faa1969b70a4a97c407d69614a5d5a3e26ea07286d13f0a2ab8daccc288152903"
+pip install "https://baidu-kunlun-public.su.bcebos.com/v1/baidu-kunlun-share/1130/xtorch_ops-0.1.2209%2B6752ad20-cp310-cp310-linux_x86_64.whl?authorization=bce-auth-v1%2FALTAKypXxBzU7gg4Mk4K4c6OYR%2F2025-12-05T06%3A18%3A00Z%2F-1%2Fhost%2F14936c2b7e7c557c1400e4c467c79f7a9217374a7aa4a046711ac4d948f460cd"
 ```
 
 ## Install the KLX3 custom Triton build
 ```
-pip install "https://baidu-kunlun-public.su.bcebos.com/v1/baidu-kunlun-share/1130/xtorch_ops-0.1.2209%2B6752ad20-cp310-cp310-linux_x86_64.whl?authorization=bce-auth-v1%2FALTAKypXxBzU7gg4Mk4K4c6OYR%2F2025-12-05T06%3A18%3A00Z%2F-1%2Fhost%2F14936c2b7e7c557c1400e4c467c79f7a9217374a7aa4a046711ac4d948f460cd"
+pip install "https://cce-ai-models.bj.bcebos.com/v1/vllm-kunlun-0.11.0/triton-3.0.0%2Bb2cde523-cp310-cp310-linux_x86_64.whl?authorization=bce-auth-v1%2FALTAKxPW2jzoJUuFZmI19s3yry%2F2025-11-05T02%3A47%3A29Z%2F-1%2Fhost%2Fd8c95dbd06187a3140ca3e681e00c6941c30e14bb1d4112a0c8bc3c93e5c9c3f"
 ```
 ## Install the AIAK custom ops library
 ```
-pip install "https://cce-ai-models.bj.bcebos.com/v1/vllm-kunlun-0.11.0/triton-3.0.0%2Bb2cde523-cp310-cp310-linux_x86_64.whl?authorization=bce-auth-v1%2FALTAKxPW2jzoJUuFZmI19s3yry%2F2025-11-05T02%3A47%3A29Z%2F-1%2Fhost%2Fd8c95dbd06187a3140ca3e681e00c6941c30e14bb1d4112a0c8bc3c93e5c9c3f"
+pip install "https://cce-ai-models.bj.bcebos.com/v1/chenyili/xspeedgate_ops-0.0.0-cp310-cp310-linux_x86_64.whl?authorization=bce-auth-v1%2FALTAKxPW2jzoJUuFZmI19s3yry%2F2025-12-05T06%3A37%3A39Z%2F-1%2Fhost%2F1002777dadd2afe4c1f047cbf0d94244d5b1f03295cd8f7a2802b92a13cd5035"
 ```
 ## Quick Start
 
