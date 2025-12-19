@@ -1092,6 +1092,52 @@ def _fake_rotary_embedding(
 
 rotary_embedding.register_fake(_fake_rotary_embedding)
 
+@custom_op("_C::rotary_embedding_gptj", mutates_args=())
+def rotary_embedding_gptj(
+    positions: torch.Tensor,
+    query_x: torch.Tensor,
+    key_x: torch.Tensor,
+    head_size: int,
+    cos_sin_cache: torch.Tensor,
+    k_emb: torch.Tensor = None,
+) -> None :
+    xtorch_ops.rotary_embedding_gptj(
+        positions=positions,
+        query_x=query_x,
+        key_x=key_x,
+        head_size=head_size,
+        cos_sin_cache=cos_sin_cache)
+
+@impl("_C::rotary_embedding_gptj", "CUDA")
+def rotary_embedding_gptj_cuda(
+    positions: torch.Tensor,
+    query_x: torch.Tensor,
+    key_x: torch.Tensor,
+    head_size: int,
+    cos_sin_cache: torch.Tensor,
+    k_emb: torch.Tensor = None,
+) -> None:
+    xtorch_ops.rotary_embedding_gptj(
+        positions=positions,
+        query_x=query_x,
+        key_x=key_x,
+        head_size=head_size,
+        cos_sin_cache=cos_sin_cache)
+
+
+def _fake_rotary_embedding_gptj(
+    positions: torch.Tensor,
+    query_x: torch.Tensor,
+    key_x: torch.Tensor,
+    head_size: int,
+    cos_sin_cache: torch.Tensor,
+    k_emb: torch.Tensor = None,
+)-> None:
+    return None
+
+
+rotary_embedding_gptj.register_fake(_fake_rotary_embedding_gptj)
+
 @custom_op("_C::split_norm_rope_neox", mutates_args=())
 def split_norm_rope_neox(
     q_emb: torch.Tensor,
