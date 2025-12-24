@@ -19,3 +19,7 @@ import vllm_kunlun.ops.rotary_embedding
 import vllm_kunlun.ops.layernorm
 import vllm_kunlun.ops.quantization.awq
 import vllm_kunlun.ops.quantization.gptq
+import vllm_kunlun.ops.quantization.compressed_tensors.compressed_tensors
+import vllm_kunlun.ops.quantization.compressed_tensors.compressed_tensors_moe
+import vllm_kunlun.ops.quantization.kernels.scaled_mm.kunlun
+import vllm_kunlun.ops.linear
