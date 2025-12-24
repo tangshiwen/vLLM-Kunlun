@@ -25,3 +25,6 @@ import vllm_kunlun.ops.quantization.kernels.scaled_mm.cutlass
 import vllm_kunlun.ops.vocab_parallel_embedding
 import vllm_kunlun.ops.quantization.compressed_tensors_moe
 import vllm_kunlun.ops.fused_moe.layer
+import vllm_kunlun.ops.quantization.compressed_tensors.compressed_tensors
+import vllm_kunlun.ops.quantization.compressed_tensors.compressed_tensors_moe
+import vllm_kunlun.ops.quantization.kernels.scaled_mm.kunlun
