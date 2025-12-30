@@ -10,6 +10,14 @@ from vllm.model_executor.layers.quantization.compressed_tensors.compressed_tenso
 )
 
 
+def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
+
+    # NOTE: xtorch_ops use max as scale
+    with torch.no_grad():
+        layer.w13_weight_scale.mul_(127.0)
+        layer.w2_weight_scale.mul_(127.0)
+
+
 def apply(
     self,
     layer: torch.nn.Module,
@@ -38,9 +46,9 @@ def apply(
     torch.ops._C.moe_ffn_per_token_block(
         x=x,
         inter_weight=layer.w13_weight,
-        inter_scale=layer.w13_weight_scale * 127.0,  # NOTE: xtorch_ops use max as scale
+        inter_scale=layer.w13_weight_scale,  
         outer_weight=layer.w2_weight,
-        outer_scale=layer.w2_weight_scale * 127.0,
+        outer_scale=layer.w2_weight_scale,
         top_k=top_k,
         global_num_experts=global_num_experts,
         linear_weights=linear_weights,
@@ -54,4 +62,5 @@ def apply(
     return output
 
 
+CompressedTensorsW8A8Int8MoEMethod.process_weights_after_loading = process_weights_after_loading
 CompressedTensorsW8A8Int8MoEMethod.apply = apply

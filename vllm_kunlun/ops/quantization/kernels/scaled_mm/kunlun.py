@@ -34,6 +34,12 @@ class KunlunScaledMMLinearKernel(CutlassScaledMMLinearKernel):
 
         return True, None
 
+    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
+        super().process_weights_after_loading(layer)
+        
+        with torch.no_grad():
+            getattr(layer, self.w_s_name).mul_(127.0)
+
     def apply_weights(
         self,
         layer: torch.nn.Module,
@@ -59,7 +65,10 @@ class KunlunScaledMMLinearKernel(CutlassScaledMMLinearKernel):
                 (x.numel() // x.shape[-1], 1), device=x.device, dtype=torch.float32
             )
             x_zp = None if symmetric else torch.empty_like(x_s, dtype=torch.int32)
-            torch.ops._C.dynamic_scaled_int8_quant(x_q, x.contiguous(), x_s, x_zp)
+
+            # HACK: quant2d do not support asymmetric quant.
+            # NOTE: x_s is the max.
+            torch.ops._C.quant2d(x_q, x.contiguous(), x_s)
 
         out = torch.empty(
             (x_q.shape[0], w_q.shape[1]), dtype=x.dtype, device=x_q.device
@@ -86,11 +95,11 @@ class KunlunScaledMMLinearKernel(CutlassScaledMMLinearKernel):
             return out
         else:
             # symmetric
-            w_s = w_s.transpose(0, 1)  # NOTE: scale dim is [n, 1]
-            torch.ops._C.cutlass_scaled_mm(
+            # NOTE: x_s, w_s are the max. 
+            torch.ops._C.matmul(
                 out,
-                x_q.contiguous(),
-                w_q.contiguous(),
+                x_q,
+                w_q,
                 x_s,
                 w_s,
                 None if bias is None else bias.contiguous(),

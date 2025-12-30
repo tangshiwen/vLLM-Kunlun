@@ -1516,3 +1516,110 @@ def fake_static_scaled_int8_quant(
     return None
 
 static_scaled_int8_quant.register_fake(fake_static_scaled_int8_quant)
+
+
+##################################################
+# ------------------ matmul ---------------------
+##################################################
+@custom_op("_C::matmul", mutates_args=())
+def matmul(
+    out: torch.Tensor,
+    x_q: torch.Tensor,
+    w_q: torch.Tensor,
+    x_s: torch.Tensor,
+    w_s: torch.Tensor,
+    bias: Optional[torch.Tensor] = None,
+)-> None:
+    w_q = w_q.transpose(0, 1)
+    xtorch_ops.matmul(
+        x_q.contiguous(),
+        w_q.contiguous(),
+        out,
+        x_trans=False,
+        w_trans=True,
+        alpha=1.0,
+        beta=0.0,
+        bias=bias,
+        x_max=None,
+        w_max=None,
+        x_pc_max=x_s,
+        w_pc_max=w_s
+    )
+
+@impl("_C::matmul", "CUDA")
+def matmul_cuda(
+    out: torch.Tensor,
+    x_q: torch.Tensor,
+    w_q: torch.Tensor,
+    x_s: torch.Tensor,
+    w_s: torch.Tensor,
+    bias: Optional[torch.Tensor] = None,
+)-> None:
+    w_q = w_q.transpose(0, 1)
+    xtorch_ops.matmul(
+        x_q.contiguous(),
+        w_q.contiguous(),
+        out,
+        x_trans=False,
+        w_trans=True,
+        alpha=1.0,
+        beta=0.0,
+        bias=bias,
+        x_max=None,
+        w_max=None,
+        x_pc_max=x_s,
+        w_pc_max=w_s
+    )
+
+def fake_matmul(
+    out: torch.Tensor,
+    x_q: torch.Tensor,
+    w_q: torch.Tensor,
+    x_s: torch.Tensor,
+    w_s: torch.Tensor,
+    bias: Optional[torch.Tensor] = None,
+)-> None:
+    return None
+
+matmul.register_fake(fake_matmul)
+
+
+##################################################
+# ------------------- quant2d --------------------
+##################################################
+@custom_op("_C::quant2d", mutates_args=())
+def quant2d(
+    y: torch.Tensor,
+    x: torch.Tensor,
+    scale: torch.Tensor
+)-> None:
+    xtorch_ops.quant2d(
+        x,
+        y,
+        scale,
+        force_sdnn=False,
+    )
+
+@impl("_C::quant2d", "CUDA")
+def quant2d_cuda(
+    y: torch.Tensor,
+    x: torch.Tensor,
+    scale: torch.Tensor,
+)-> None:
+    xtorch_ops.quant2d(
+        x,
+        y,
+        scale,
+        force_sdnn=False,
+    )
+
+def fake_quant2d(
+    y: torch.Tensor,
+    x: torch.Tensor,
+    scale: torch.Tensor,
+)-> None:
+    return None
+
+quant2d.register_fake(fake_quant2d)
+
+
