@@ -66,9 +66,12 @@ class KunlunScaledMMLinearKernel(CutlassScaledMMLinearKernel):
             )
             x_zp = None if symmetric else torch.empty_like(x_s, dtype=torch.int32)
 
-            # HACK: quant2d do not support asymmetric quant.
-            # NOTE: x_s is the max.
-            torch.ops._C.quant2d(x_q, x.contiguous(), x_s)
+            if symmetric:
+                # NOTE: For quant2d ops, x_s represents the max.
+                torch.ops._C.quant2d(x_q, x.contiguous(), x_s)
+            else:
+                # NOTE: For dynamic_scaled_int8_quant ops, x_s represents the scale.
+                torch.ops._C.dynamic_scaled_int8_quant(x_q, x.contiguous(), x_s, x_zp)
 
         out = torch.empty(
             (x_q.shape[0], w_q.shape[1]), dtype=x.dtype, device=x_q.device
@@ -78,9 +81,8 @@ class KunlunScaledMMLinearKernel(CutlassScaledMMLinearKernel):
             # Currently, static is always per-tensor and dynamic is per-token
 
             # FIXME: azp_adj speedup function is working in progress
-            # static = i_zp is not None
-            # azp = None if static else x_zp
-
+            # NOTE: For cutlass_scaled_mm_azp ops, x_s and w_s represent the scale.
+            w_s = (w_s / 127.0).transpose(0, 1) # NOTE: scale dim is [n, 1]
             azp = x_zp
             torch.ops._C.cutlass_scaled_mm_azp(
                 out,
@@ -95,7 +97,7 @@ class KunlunScaledMMLinearKernel(CutlassScaledMMLinearKernel):
             return out
         else:
             # symmetric
-            # NOTE: x_s, w_s are the max.
+            # NOTE: For matmul ops, x_s and w_s represent the max.
             torch.ops._C.matmul(
                 out,
                 x_q,
