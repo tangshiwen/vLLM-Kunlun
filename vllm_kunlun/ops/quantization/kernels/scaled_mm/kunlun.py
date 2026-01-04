@@ -36,7 +36,7 @@ class KunlunScaledMMLinearKernel(CutlassScaledMMLinearKernel):
 
     def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
         super().process_weights_after_loading(layer)
-        
+
         with torch.no_grad():
             getattr(layer, self.w_s_name).mul_(127.0)
 
@@ -90,19 +90,19 @@ class KunlunScaledMMLinearKernel(CutlassScaledMMLinearKernel):
                 w_s,
                 azp_adj,
                 azp,
-                None if bias is None else bias.contiguous(),
+                None if bias is None else bias.to(torch.float32).contiguous(),
             )
             return out
         else:
             # symmetric
-            # NOTE: x_s, w_s are the max. 
+            # NOTE: x_s, w_s are the max.
             torch.ops._C.matmul(
                 out,
                 x_q,
                 w_q,
                 x_s,
                 w_s,
-                None if bias is None else bias.contiguous(),
+                None if bias is None else bias.to(torch.float32).contiguous(),
             )
             return out
 
