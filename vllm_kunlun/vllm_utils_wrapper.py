@@ -2,7 +2,7 @@
 
 import vllm.distributed.parallel_state as parallel_state
 import vllm.utils as _orig
-from typing import Any, Callable, Optional, Union, get_origin, get_args, List
+from typing import Any, Callable, Optional, Union, get_origin, get_args, List, Tuple
 from types import SimpleNamespace
 import torch
 from torch.library import Library
@@ -1555,166 +1555,174 @@ def _fake_concat_and_cache_mla(
 concat_and_cache_mla.register_fake(_fake_concat_and_cache_mla)
 
 
-##################################################
-# -------------- cutlass_scaled_mm ---------------
-##################################################
+######################################################
+# -------------- scaled_int8_quant -------------------
+######################################################
+@custom_op("_C::scaled_int8_quant", mutates_args=())
+def scaled_int8_quant(
+    x: torch.Tensor,
+    scale: torch.Tensor,
+    azp: Optional[torch.Tensor] = None,
+    symmetric: bool = True,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, bool]:
+    static = False
+    x_q = torch.empty_like(x, dtype=torch.int8, device=x.device)
+    if scale is not None:  # static
+        static = True
+        torch.ops.xspeedgate_ops.static_scaled_int8_quant(x_q, x, scale, azp)
+    else:  # dynamic
+        scale = torch.empty(
+            (x.numel() // x.shape[-1], 1), device=x.device, dtype=torch.float32
+        )
+        azp = None if symmetric else torch.empty_like(scale, dtype=torch.int32)
+        if symmetric:
+            # NOTE: For quant2d ops, scale represents max.
+            xtorch_ops.quant2d(x=x.contiguous(), y=x_q, max=scale, force_sdnn=True)
+        else:
+            torch.ops.xspeedgate_ops.dynamic_scaled_int8_quant(
+                x_q, x.contiguous(), scale, azp
+            )
+    return x_q, scale, azp, static
+
+
+@impl("_C::scaled_int8_quant", "CUDA")
+def scaled_int8_quant_cuda(
+    x: torch.Tensor,
+    scale: torch.Tensor,
+    azp: Optional[torch.Tensor] = None,
+    symmetric: bool = True,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, bool]:
+    static = False
+    x_q = torch.empty_like(x, dtype=torch.int8, device=x.device)
+    if scale is not None:  # static
+        static = True
+        torch.ops.xspeedgate_ops.static_scaled_int8_quant(x_q, x, scale, azp)
+    else:  # dynamic
+        scale = torch.empty(
+            (x.numel() // x.shape[-1], 1), device=x.device, dtype=torch.float32
+        )
+        azp = None if symmetric else torch.empty_like(scale, dtype=torch.int32)
+        if symmetric:
+            # NOTE: For quant2d ops, scale represents max.
+            xtorch_ops.quant2d(x=x.contiguous(), y=x_q, max=scale, force_sdnn=True)
+        else:
+            torch.ops.xspeedgate_ops.dynamic_scaled_int8_quant(
+                x_q, x.contiguous(), scale, azp
+            )
+    return x_q, scale, azp, static
+
+
+def fake_scaled_int8_quant(
+    x: torch.Tensor,
+    scale: torch.Tensor,
+    azp: Optional[torch.Tensor] = None,
+    symmetric: bool = True,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, bool]:
+    x_q = torch.ones(x.shape, dtype=torch.int8, device=x.device)
+    return x_q, scale, azp, False
+
+
+scaled_int8_quant.register_fake(fake_scaled_int8_quant)
+
+
+######################################################
+# ---------------- cutlass_scaled_mm -----------------
+######################################################
 @custom_op("_C::cutlass_scaled_mm", mutates_args=())
 def cutlass_scaled_mm(
-    out: torch.Tensor,
     a: torch.Tensor,
     b: torch.Tensor,
     scale_a: torch.Tensor,
     scale_b: torch.Tensor,
+    out_dtype: torch.dtype,
     bias: Optional[torch.Tensor] = None,
-) -> None:
+) -> torch.Tensor:
+    out = torch.empty((a.shape[0], b.shape[1]), dtype=out_dtype, device=a.device)
     torch.ops.xspeedgate_ops.cutlass_scaled_mm(out, a, b, scale_a, scale_b, bias)
+    return out
 
 
 @impl("_C::cutlass_scaled_mm", "CUDA")
 def cutlass_scaled_mm_cuda(
-    out: torch.Tensor,
     a: torch.Tensor,
     b: torch.Tensor,
     scale_a: torch.Tensor,
     scale_b: torch.Tensor,
+    out_dtype: torch.dtype,
     bias: Optional[torch.Tensor] = None,
-) -> None:
+) -> torch.Tensor:
+    out = torch.empty((a.shape[0], b.shape[1]), dtype=out_dtype, device=a.device)
     torch.ops.xspeedgate_ops.cutlass_scaled_mm(out, a, b, scale_a, scale_b, bias)
+    return out
 
 
 def fake_cutlass_scaled_mm(
-    out: torch.Tensor,
     a: torch.Tensor,
     b: torch.Tensor,
     scale_a: torch.Tensor,
     scale_b: torch.Tensor,
+    out_dtype: torch.dtype,
     bias: Optional[torch.Tensor] = None,
-) -> None:
-    return None
+) -> torch.Tensor:
+    return torch.empty((a.shape[0], b.shape[1]), dtype=out_dtype, device=a.device)
 
 
 cutlass_scaled_mm.register_fake(fake_cutlass_scaled_mm)
 
 
-##################################################
-# ---------- cutlass_scaled_mm_azp ---------------
-##################################################
+######################################################
+# ------------ cutlass_scaled_mm_azp -----------------
+######################################################
 @custom_op("_C::cutlass_scaled_mm_azp", mutates_args=())
 def cutlass_scaled_mm_azp(
-    out: torch.Tensor,
     a: torch.Tensor,
     b: torch.Tensor,
     scale_a: torch.Tensor,
     scale_b: torch.Tensor,
+    out_dtype: torch.dtype,
     azp_adj: torch.Tensor,
     azp: Optional[torch.Tensor] = None,
     bias: Optional[torch.Tensor] = None,
-) -> None:
+) -> torch.Tensor:
+    out = torch.empty((a.shape[0], b.shape[1]), dtype=out_dtype, device=a.device)
     torch.ops.xspeedgate_ops.cutlass_scaled_mm_azp(
         out, a, b, scale_a, scale_b, azp_adj, azp, bias
     )
+    return out
 
 
 @impl("_C::cutlass_scaled_mm_azp", "CUDA")
 def cutlass_scaled_mm_azp_cuda(
-    out: torch.Tensor,
     a: torch.Tensor,
     b: torch.Tensor,
     scale_a: torch.Tensor,
     scale_b: torch.Tensor,
+    out_dtype: torch.dtype,
     azp_adj: torch.Tensor,
     azp: Optional[torch.Tensor] = None,
     bias: Optional[torch.Tensor] = None,
-) -> None:
+) -> torch.Tensor:
+    out = torch.empty((a.shape[0], b.shape[1]), dtype=out_dtype, device=a.device)
     torch.ops.xspeedgate_ops.cutlass_scaled_mm_azp(
         out, a, b, scale_a, scale_b, azp_adj, azp, bias
     )
+    return out
 
 
 def fake_cutlass_scaled_mm_azp(
-    out: torch.Tensor,
     a: torch.Tensor,
     b: torch.Tensor,
     scale_a: torch.Tensor,
     scale_b: torch.Tensor,
+    out_dtype: torch.dtype,
     azp_adj: torch.Tensor,
     azp: Optional[torch.Tensor] = None,
     bias: Optional[torch.Tensor] = None,
-) -> None:
-    return None
+) -> torch.Tensor:
+    return torch.empty((a.shape[0], b.shape[1]), dtype=out_dtype, device=a.device)
 
 
 cutlass_scaled_mm_azp.register_fake(fake_cutlass_scaled_mm_azp)
-
-
-##################################################
-# ---------- dynamic_scaled_int8_quant -----------
-##################################################
-@custom_op("_C::dynamic_scaled_int8_quant", mutates_args=())
-def dynamic_scaled_int8_quant(
-    y: torch.Tensor,
-    x: torch.Tensor,
-    scale: torch.Tensor,
-    azp: Optional[torch.Tensor] = None,
-) -> None:
-    torch.ops.xspeedgate_ops.dynamic_scaled_int8_quant(y, x, scale, azp)
-
-
-@impl("_C::dynamic_scaled_int8_quant", "CUDA")
-def dynamic_scaled_int8_quant_cuda(
-    y: torch.Tensor,
-    x: torch.Tensor,
-    scale: torch.Tensor,
-    azp: Optional[torch.Tensor] = None,
-) -> None:
-    torch.ops.xspeedgate_ops.dynamic_scaled_int8_quant(y, x, scale, azp)
-
-
-def fake_dynamic_scaled_int8_quant(
-    y: torch.Tensor,
-    x: torch.Tensor,
-    scale: torch.Tensor,
-    azp: Optional[torch.Tensor] = None,
-) -> None:
-    return None
-
-
-dynamic_scaled_int8_quant.register_fake(fake_dynamic_scaled_int8_quant)
-
-
-##################################################
-# ---------- static_scaled_int8_quant ------------
-##################################################
-@custom_op("_C::static_scaled_int8_quant", mutates_args=())
-def static_scaled_int8_quant(
-    y: torch.Tensor,
-    x: torch.Tensor,
-    scale: torch.Tensor,
-    azp: Optional[torch.Tensor] = None,
-) -> None:
-    torch.ops.xspeedgate_ops.static_scaled_int8_quant(y, x, scale, azp)
-
-
-@impl("_C::static_scaled_int8_quant", "CUDA")
-def static_scaled_int8_quant_cuda(
-    y: torch.Tensor,
-    x: torch.Tensor,
-    scale: torch.Tensor,
-    azp: Optional[torch.Tensor] = None,
-) -> None:
-    torch.ops.xspeedgate_ops.static_scaled_int8_quant(y, x, scale, azp)
-
-
-def fake_static_scaled_int8_quant(
-    y: torch.Tensor,
-    x: torch.Tensor,
-    scale: torch.Tensor,
-    azp: Optional[torch.Tensor] = None,
-) -> None:
-    return None
-
-
-static_scaled_int8_quant.register_fake(fake_static_scaled_int8_quant)
 
 
 ##################################################
@@ -1722,23 +1730,28 @@ static_scaled_int8_quant.register_fake(fake_static_scaled_int8_quant)
 ##################################################
 @custom_op("_C::matmul", mutates_args=())
 def matmul(
-    out: torch.Tensor,
-    x_q: torch.Tensor,
-    w_q: torch.Tensor,
-    x_s: torch.Tensor,
-    w_s: torch.Tensor,
-    bias: Optional[torch.Tensor] = None,
-    x_trans: Optional[bool] = False,
-    w_trans: Optional[bool] = True,
-    alpha: Optional[float] = 1.0,
-    beta: Optional[float] = 0.0,
-    x_max: Optional[torch.Tensor] = None,
-    w_max: Optional[torch.Tensor] = None,
-) -> None:
+    x: torch.Tensor,
+    w: torch.Tensor,
+    out_dtype: torch.dtype,
+    x_trans: bool = False,
+    w_trans: bool = True,
+    alpha: float = 1.0,
+    beta: float = 0.0,
+    bias: torch.Tensor = None,
+    x_max: torch.Tensor = None,
+    w_max: torch.Tensor = None,
+    x_pc_max: torch.Tensor = None,
+    w_pc_max: torch.Tensor = None,
+) -> torch.Tensor:
+    out = torch.empty(
+        (x.shape[0], w.shape[0] if w_trans else w.shape[1]),
+        dtype=out_dtype,
+        device=x.device,
+    )
     xtorch_ops.matmul(
-        x_q.contiguous(),
-        w_q.contiguous(),
-        out,
+        x=x.contiguous(),
+        w=w.contiguous(),
+        out=out,
         x_trans=x_trans,
         w_trans=w_trans,
         alpha=alpha,
@@ -1746,30 +1759,36 @@ def matmul(
         bias=bias,
         x_max=x_max,
         w_max=w_max,
-        x_pc_max=x_s,
-        w_pc_max=w_s,
+        x_pc_max=x_pc_max,
+        w_pc_max=w_pc_max,
     )
+    return out
 
 
 @impl("_C::matmul", "CUDA")
 def matmul_cuda(
-    out: torch.Tensor,
-    x_q: torch.Tensor,
-    w_q: torch.Tensor,
-    x_s: torch.Tensor,
-    w_s: torch.Tensor,
-    bias: Optional[torch.Tensor] = None,
-    x_trans: Optional[bool] = False,
-    w_trans: Optional[bool] = True,
-    alpha: Optional[float] = 1.0,
-    beta: Optional[float] = 0.0,
-    x_max: Optional[torch.Tensor] = None,
-    w_max: Optional[torch.Tensor] = None,
-) -> None:
+    x: torch.Tensor,
+    w: torch.Tensor,
+    out_dtype: torch.dtype,
+    x_trans: bool = False,
+    w_trans: bool = True,
+    alpha: float = 1.0,
+    beta: float = 0.0,
+    bias: torch.Tensor = None,
+    x_max: torch.Tensor = None,
+    w_max: torch.Tensor = None,
+    x_pc_max: torch.Tensor = None,
+    w_pc_max: torch.Tensor = None,
+) -> torch.Tensor:
+    out = torch.empty(
+        (x.shape[0], w.shape[0] if w_trans else w.shape[1]),
+        dtype=out_dtype,
+        device=x.device,
+    )
     xtorch_ops.matmul(
-        x_q.contiguous(),
-        w_q.contiguous(),
-        out,
+        x=x.contiguous(),
+        w=w.contiguous(),
+        out=out,
         x_trans=x_trans,
         w_trans=w_trans,
         alpha=alpha,
@@ -1777,26 +1796,31 @@ def matmul_cuda(
         bias=bias,
         x_max=x_max,
         w_max=w_max,
-        x_pc_max=x_s,
-        w_pc_max=w_s,
+        x_pc_max=x_pc_max,
+        w_pc_max=w_pc_max,
     )
+    return out
 
 
 def fake_matmul(
-    out: torch.Tensor,
-    x_q: torch.Tensor,
-    w_q: torch.Tensor,
-    x_s: torch.Tensor,
-    w_s: torch.Tensor,
-    bias: Optional[torch.Tensor] = None,
-    x_trans: Optional[bool] = False,
-    w_trans: Optional[bool] = True,
-    alpha: Optional[float] = 1.0,
-    beta: Optional[float] = 0.0,
-    x_max: Optional[torch.Tensor] = None,
-    w_max: Optional[torch.Tensor] = None,
-) -> None:
-    return None
+    x: torch.Tensor,
+    w: torch.Tensor,
+    out_dtype: torch.dtype,
+    x_trans: bool = False,
+    w_trans: bool = True,
+    alpha: float = 1.0,
+    beta: float = 0.0,
+    bias: torch.Tensor = None,
+    x_max: torch.Tensor = None,
+    w_max: torch.Tensor = None,
+    x_pc_max: torch.Tensor = None,
+    w_pc_max: torch.Tensor = None,
+) -> torch.Tensor:
+    return torch.empty(
+        (x.shape[0], w.shape[0] if w_trans else w.shape[1]),
+        dtype=out_dtype,
+        device=x.device,
+    )
 
 
 matmul.register_fake(fake_matmul)
@@ -1809,13 +1833,13 @@ matmul.register_fake(fake_matmul)
 def quant2d(
     y: torch.Tensor,
     x: torch.Tensor,
-    scale: torch.Tensor,
+    max: torch.Tensor,
     force_sdnn: Optional[bool] = False,
 ) -> None:
     xtorch_ops.quant2d(
-        x,
-        y,
-        scale,
+        x=x,
+        y=y,
+        max=max,
         force_sdnn=force_sdnn,
     )
 
@@ -1824,13 +1848,13 @@ def quant2d(
 def quant2d_cuda(
     y: torch.Tensor,
     x: torch.Tensor,
-    scale: torch.Tensor,
+    max: torch.Tensor,
     force_sdnn: Optional[bool] = False,
 ) -> None:
     xtorch_ops.quant2d(
-        x,
-        y,
-        scale,
+        x=x,
+        y=y,
+        max=max,
         force_sdnn=force_sdnn,
     )
 
@@ -1838,7 +1862,7 @@ def quant2d_cuda(
 def fake_quant2d(
     y: torch.Tensor,
     x: torch.Tensor,
-    scale: torch.Tensor,
+    max: torch.Tensor,
     force_sdnn: Optional[bool] = False,
 ) -> None:
     return None

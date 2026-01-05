@@ -26,25 +26,6 @@ def _custom_import(module_name, globals=None, locals=None, fromlist=(), level=0)
             module = importlib.import_module(target_module)
             sys.modules[module_name] = module
             sys.modules[target_module] = module
-            return module
-
-        relative_mappings = {
-            ("compressed_tensors_moe", "compressed_tensors"): "vllm_kunlun.ops.quantization.compressed_tensors_moe",
-            ("layer", "fused_moe"): "vllm_kunlun.ops.fused_moe.layer",
-        }
-
-        if level == 1:
-            parent = globals.get('__package__', '').split('.')[-1] if globals else ''
-            key = (module_name, parent)
-            if key in relative_mappings:
-                if module_name in sys.modules:
-                    return sys.modules[module_name]
-                target_module = relative_mappings[key]
-                module = importlib.import_module(target_module)
-                sys.modules[module_name] = module
-                sys.modules[target_module] = module
-                return module
-
     except Exception:
         pass
 
@@ -58,20 +39,7 @@ def _custom_import(module_name, globals=None, locals=None, fromlist=(), level=0)
 
 def import_hook():
     """Apply import hook for VLLM Kunlun"""
-    if not int(os.environ.get("DISABLE_KUNLUN_HOOK", "0")):
-        builtins.__import__ = _custom_import
-        
-        try:
-            modules_to_preload = [
-                "vllm_kunlun.ops.quantization.compressed_tensors_moe",
-                "vllm_kunlun.ops.fused_moe.custom_ops",
-                "vllm_kunlun.ops.fused_moe.layer",
-                "vllm_kunlun.ops.quantization.fp8",
-            ]
-            for module_name in modules_to_preload:
-                importlib.import_module(module_name)
-        except Exception:
-            pass
+    builtins.__import__ = _custom_import
 
 def register():
     """Register the Kunlun platform"""

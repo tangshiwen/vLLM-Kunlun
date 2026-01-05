@@ -1,6 +1,20 @@
-"""
-Copyright (c) 2025 Baidu, Inc. All Rights Reserved.
-"""
+#
+# Copyright (c) 2025 Baidu, Inc. All Rights Reserved.
+# Author: Tang Shiwen, Li Wei
+# Email: tangshiwen@baidu.com, liwei157@baidu.com
+# This file is a part of the vllm-kunlun project.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from typing import Optional
 
@@ -13,17 +27,13 @@ from vllm.model_executor.layers.linear import (
 from vllm.model_executor.layers.quantization.compressed_tensors.compressed_tensors import (  # noqa: E501
     CompressedTensorsConfig,
     CompressedTensorsLinearMethod,
-    CompressedTensorsKVCacheMethod,
-)
-from vllm.model_executor.layers.quantization.compressed_tensors.compressed_tensors_moe import (  # noqa: E501
     CompressedTensorsMoEMethod,
-)
-from vllm_kunlun.ops.fused_moe.layer import FusedMoE
-from vllm.model_executor.layers.quantization.base_config import QuantizeMethodBase
-from vllm.model_executor.layers.quantization.compressed_tensors.transform.linear import (  # noqa: E501
+    CompressedTensorsKVCacheMethod,
     CompressedTensorsLinearTransformMethod,
     get_linear_transform_schemes,
 )
+from vllm.model_executor.layers.quantization.base_config import QuantizeMethodBase
+from vllm_kunlun.ops.fused_moe.layer import FusedMoE
 
 
 def get_quant_method(
